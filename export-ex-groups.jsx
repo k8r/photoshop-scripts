@@ -52,16 +52,22 @@ app.bringToFront();
 
     try {
         var exportedCount = 0;
+        var skippedNoPrefix = [];
+        var skippedHiddenParent = [];
+        var skippedChildNoPrefix = [];
+        var skippedHiddenChild = [];
         var notes = [];
 
         for (var i = 0; i < doc.layerSets.length; i++) {
             var parentGroup = doc.layerSets[i];
 
             if (!startsWith(parentGroup.name, EXPORT_PREFIX)) {
+                skippedNoPrefix.push(parentGroup.name);
                 continue;
             }
 
             if (!parentGroup.visible) {
+                skippedHiddenParent.push(parentGroup.name);
                 continue;
             }
 
@@ -96,7 +102,7 @@ app.bringToFront();
                     right: doc.width.as("px"),
                     bottom: doc.height.as("px")
                 };
-                notes.push("Parent group '" + parentGroup.name + "' has no '" + WIDGET_SIZE_LAYER + "' layer; used full canvas size.");
+                notes.push("Parent group '" + parentGroup.name + "' has no '" + WIDGET_SIZE_LAYER + "' layer; will trim to visible content.");
             }
 
             var exportWidth = exportRect.right - exportRect.left;
@@ -111,10 +117,12 @@ app.bringToFront();
                 var childGroup = parentGroup.layerSets[j];
 
                 if (!startsWith(childGroup.name, CHILD_EXPORT_PREFIX)) {
+                    skippedChildNoPrefix.push(parentGroup.name + " > " + childGroup.name);
                     continue;
                 }
 
                 if (!childGroup.visible) {
+                    skippedHiddenChild.push(parentGroup.name + " > " + childGroup.name);
                     continue;
                 }
 
@@ -134,6 +142,19 @@ app.bringToFront();
         }
 
         var summary = "Done.\nExported: " + exportedCount;
+        summary += "\nTop-level groups: " + doc.layerSets.length;
+        if (skippedNoPrefix.length) {
+            summary += "\n\nSkipped (no EX_ prefix):\n- " + skippedNoPrefix.join("\n- ");
+        }
+        if (skippedHiddenParent.length) {
+            summary += "\n\nSkipped (hidden EX_ groups):\n- " + skippedHiddenParent.join("\n- ");
+        }
+        if (skippedChildNoPrefix.length) {
+            summary += "\n\nSkipped (no ex_ prefix):\n- " + skippedChildNoPrefix.join("\n- ");
+        }
+        if (skippedHiddenChild.length) {
+            summary += "\n\nSkipped (hidden ex_ subgroups):\n- " + skippedHiddenChild.join("\n- ");
+        }
         if (notes.length) {
             summary += "\n\nNotes:\n- " + notes.join("\n- ");
         }
