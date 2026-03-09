@@ -28,7 +28,6 @@ app.bringToFront();
     var CHILD_EXPORT_PREFIX = "ex_";
     var WIDGET_SIZE_LAYER = "ws";
     var PATH_PREFIX = "path_";
-    var HIDE_WIDGET_IN_EXPORT = true;
 
     var settingsFile = new File(File($.fileName).parent.fsName + "/export-ex-groups.lastdir");
     var startFolder = Folder.desktop;
@@ -56,6 +55,7 @@ app.bringToFront();
         var skippedHiddenParent = [];
         var skippedChildNoPrefix = [];
         var skippedHiddenChild = [];
+        var groupBounds = [];
         var notes = [];
 
         for (var i = 0; i < doc.layerSets.length; i++) {
@@ -71,7 +71,7 @@ app.bringToFront();
                 continue;
             }
 
-            var widgetLayer = findImmediateArtLayerByName(parentGroup, WIDGET_SIZE_LAYER);
+            var widgetSizeLayer = findImmediateArtLayerByName(parentGroup, WIDGET_SIZE_LAYER);
 
             var pathLayer = findImmediateArtLayerByPrefix(parentGroup, PATH_PREFIX);
             var groupOutputFolder = outputFolder;
@@ -86,13 +86,16 @@ app.bringToFront();
             var exportRect;
             var usingWidget = false;
 
-            if (widgetLayer) {
-                var widgetBounds = getBoundsPx(widgetLayer.bounds);
+            if (widgetSizeLayer) {
+                var wasVisible = widgetSizeLayer.visible;
+                widgetSizeLayer.visible = true;
+                var opaqueBounds = getCleanBounds(doc, widgetSizeLayer);
+                widgetSizeLayer.visible = wasVisible;
                 exportRect = {
-                    left: widgetBounds.left,
-                    top: widgetBounds.top,
-                    right: widgetBounds.right,
-                    bottom: widgetBounds.bottom
+                    left: opaqueBounds.left,
+                    top: opaqueBounds.top,
+                    right: opaqueBounds.right,
+                    bottom: opaqueBounds.bottom
                 };
                 usingWidget = true;
             } else {
@@ -107,6 +110,8 @@ app.bringToFront();
 
             var exportWidth = exportRect.right - exportRect.left;
             var exportHeight = exportRect.bottom - exportRect.top;
+
+            groupBounds.push(parentGroup.name + ": " + exportWidth + "x" + exportHeight + " (" + exportRect.left + "," + exportRect.top + " -> " + exportRect.right + "," + exportRect.bottom + ")");
 
             if (exportWidth <= 0 || exportHeight <= 0) {
                 notes.push("Skipped parent group '" + parentGroup.name + "' because export bounds were invalid.");
@@ -128,9 +133,8 @@ app.bringToFront();
 
                 exportChildGroup(
                     doc,
-                    parentGroup,
                     childGroup,
-                    widgetLayer,
+                    exportRect,
                     exportWidth,
                     exportHeight,
                     usingWidget,
@@ -143,6 +147,9 @@ app.bringToFront();
 
         var summary = "Done.\nExported: " + exportedCount;
         summary += "\nTop-level groups: " + doc.layerSets.length;
+        if (groupBounds.length) {
+            summary += "\n\nExport bounds:\n- " + groupBounds.join("\n- ");
+        }
         if (skippedNoPrefix.length) {
             summary += "\n\nSkipped (no EX_ prefix):\n- " + skippedNoPrefix.join("\n- ");
         }
@@ -166,7 +173,7 @@ app.bringToFront();
         app.preferences.rulerUnits = originalRulerUnits;
     }
 
-    function exportChildGroup(sourceDoc, parentGroup, childGroup, widgetLayer, exportWidth, exportHeight, usingWidget, outputFolder) {
+    function exportChildGroup(sourceDoc, childGroup, exportRect, exportWidth, exportHeight, usingWidget, outputFolder) {
         var tempDoc = app.documents.add(
             exportWidth,
             exportHeight,
@@ -179,25 +186,11 @@ app.bringToFront();
         app.activeDocument = sourceDoc;
 
         var dupChildGroup = childGroup.duplicate(tempDoc, ElementPlacement.PLACEATBEGINNING);
-        var dupWidgetLayer = null;
-
-        if (usingWidget && widgetLayer) {
-            dupWidgetLayer = widgetLayer.duplicate(tempDoc, ElementPlacement.PLACEATBEGINNING);
-        }
 
         app.activeDocument = tempDoc;
 
-        if (usingWidget && dupWidgetLayer) {
-            var dupWidgetBounds = getBoundsPx(dupWidgetLayer.bounds);
-            var dx = -dupWidgetBounds.left;
-            var dy = -dupWidgetBounds.top;
-
-            dupChildGroup.translate(dx, dy);
-            dupWidgetLayer.translate(dx, dy);
-
-            if (HIDE_WIDGET_IN_EXPORT) {
-                dupWidgetLayer.visible = false;
-            }
+        if (usingWidget) {
+            dupChildGroup.translate(-exportRect.left, -exportRect.top);
         } else {
             tempDoc.trim(TrimType.TRANSPARENT);
         }
@@ -208,6 +201,69 @@ app.bringToFront();
 
         tempDoc.close(SaveOptions.DONOTSAVECHANGES);
         app.activeDocument = sourceDoc;
+    }
+
+    function cleanUpTransparency(docRef, layer) {
+        // Delete all non-fully-opaque pixels from a layer.
+        // This eliminates stray near-transparent pixels from Procreate exports.
+        var prevActive = docRef.activeLayer;
+        docRef.activeLayer = layer;
+
+        var desc = new ActionDescriptor();
+        var ref = new ActionReference();
+        ref.putProperty(charIDToTypeID("Chnl"), charIDToTypeID("fsel"));
+        desc.putReference(charIDToTypeID("null"), ref);
+        var ref2 = new ActionReference();
+        ref2.putEnumerated(charIDToTypeID("Chnl"), charIDToTypeID("Chnl"), charIDToTypeID("Trsp"));
+        desc.putReference(charIDToTypeID("T   "), ref2);
+        executeAction(charIDToTypeID("setd"), desc, DialogModes.NO);
+
+        docRef.selection.invert();
+        docRef.selection.clear();
+        docRef.selection.deselect();
+
+        docRef.activeLayer = prevActive;
+    }
+
+    function getCleanBounds(sourceDoc, layer) {
+        // Clean up the layer, then get its bounds via a temp doc trim.
+        var tempDoc = app.documents.add(
+            sourceDoc.width,
+            sourceDoc.height,
+            sourceDoc.resolution,
+            "bounds_check",
+            NewDocumentMode.RGB,
+            DocumentFill.TRANSPARENT
+        );
+
+        app.activeDocument = sourceDoc;
+        var dupLayer = layer.duplicate(tempDoc, ElementPlacement.PLACEATBEGINNING);
+        app.activeDocument = tempDoc;
+
+        cleanUpTransparency(tempDoc, dupLayer);
+
+        var fullWidth = tempDoc.width.as("px");
+        var fullHeight = tempDoc.height.as("px");
+
+        // Trim top and left to find content position
+        tempDoc.trim(TrimType.TRANSPARENT, true, true, false, false);
+        var left = fullWidth - tempDoc.width.as("px");
+        var top = fullHeight - tempDoc.height.as("px");
+
+        // Trim bottom and right to find content size
+        tempDoc.trim(TrimType.TRANSPARENT, false, false, true, true);
+        var contentWidth = tempDoc.width.as("px");
+        var contentHeight = tempDoc.height.as("px");
+
+        tempDoc.close(SaveOptions.DONOTSAVECHANGES);
+        app.activeDocument = sourceDoc;
+
+        return {
+            left: left,
+            top: top,
+            right: left + contentWidth,
+            bottom: top + contentHeight
+        };
     }
 
     function findImmediateArtLayerByName(group, targetName) {
@@ -226,15 +282,6 @@ app.bringToFront();
             }
         }
         return null;
-    }
-
-    function getBoundsPx(bounds) {
-        return {
-            left: bounds[0].as("px"),
-            top: bounds[1].as("px"),
-            right: bounds[2].as("px"),
-            bottom: bounds[3].as("px")
-        };
     }
 
     function saveDocumentAsPNG(documentRef, outFile) {
