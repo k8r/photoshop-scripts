@@ -84,7 +84,7 @@ app.bringToFront();
             }
 
             var exportRect;
-            var usingWidget = false;
+            var usingWidgetSize = false;
 
             if (widgetSizeLayer) {
                 var wasVisible = widgetSizeLayer.visible;
@@ -97,7 +97,7 @@ app.bringToFront();
                     right: opaqueBounds.right,
                     bottom: opaqueBounds.bottom
                 };
-                usingWidget = true;
+                usingWidgetSize = true;
             } else {
                 exportRect = {
                     left: 0,
@@ -111,7 +111,9 @@ app.bringToFront();
             var exportWidth = exportRect.right - exportRect.left;
             var exportHeight = exportRect.bottom - exportRect.top;
 
-            groupBounds.push(parentGroup.name + ": " + exportWidth + "x" + exportHeight + " (" + exportRect.left + "," + exportRect.top + " -> " + exportRect.right + "," + exportRect.bottom + ")");
+            if (usingWidgetSize) {
+                groupBounds.push(parentGroup.name + ": " + exportWidth + "x" + exportHeight + " (" + exportRect.left + "," + exportRect.top + " -> " + exportRect.right + "," + exportRect.bottom + ")");
+            }
 
             if (exportWidth <= 0 || exportHeight <= 0) {
                 notes.push("Skipped parent group '" + parentGroup.name + "' because export bounds were invalid.");
@@ -137,7 +139,7 @@ app.bringToFront();
                     exportRect,
                     exportWidth,
                     exportHeight,
-                    usingWidget,
+                    usingWidgetSize,
                     groupOutputFolder
                 );
 
@@ -148,7 +150,7 @@ app.bringToFront();
         var summary = "Done.\nExported: " + exportedCount;
         summary += "\nTop-level groups: " + doc.layerSets.length;
         if (groupBounds.length) {
-            summary += "\n\nExport bounds:\n- " + groupBounds.join("\n- ");
+            summary += "\n\nWidget size (from ws layer):\n- " + groupBounds.join("\n- ");
         }
         if (skippedNoPrefix.length) {
             summary += "\n\nSkipped (no EX_ prefix):\n- " + skippedNoPrefix.join("\n- ");
@@ -173,7 +175,7 @@ app.bringToFront();
         app.preferences.rulerUnits = originalRulerUnits;
     }
 
-    function exportChildGroup(sourceDoc, childGroup, exportRect, exportWidth, exportHeight, usingWidget, outputFolder) {
+    function exportChildGroup(sourceDoc, childGroup, exportRect, exportWidth, exportHeight, usingWidgetSize, outputFolder) {
         var tempDoc = app.documents.add(
             exportWidth,
             exportHeight,
@@ -189,7 +191,7 @@ app.bringToFront();
 
         app.activeDocument = tempDoc;
 
-        if (usingWidget) {
+        if (usingWidgetSize) {
             dupChildGroup.translate(-exportRect.left, -exportRect.top);
         } else {
             tempDoc.trim(TrimType.TRANSPARENT);
