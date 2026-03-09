@@ -123,7 +123,6 @@ app.bringToFront();
                     parentGroup,
                     childGroup,
                     widgetLayer,
-                    exportRect,
                     exportWidth,
                     exportHeight,
                     usingWidget,
@@ -146,7 +145,7 @@ app.bringToFront();
         app.preferences.rulerUnits = originalRulerUnits;
     }
 
-    function exportChildGroup(sourceDoc, parentGroup, childGroup, widgetLayer, exportRect, exportWidth, exportHeight, usingWidget, outputFolder) {
+    function exportChildGroup(sourceDoc, parentGroup, childGroup, widgetLayer, exportWidth, exportHeight, usingWidget, outputFolder) {
         var tempDoc = app.documents.add(
             exportWidth,
             exportHeight,
@@ -179,13 +178,7 @@ app.bringToFront();
                 dupWidgetLayer.visible = false;
             }
         } else {
-            // No widget layer: preserve original document positioning,
-            // using the full canvas as the export frame.
-            var childBounds = getBoundsPx(dupChildGroup.bounds);
-            var dxCanvas = childBounds.left - exportRect.left;
-            var dyCanvas = childBounds.top - exportRect.top;
-
-            dupChildGroup.translate(-dxCanvas, -dyCanvas);
+            tempDoc.trim(TrimType.TRANSPARENT);
         }
 
         var safeName = sanitizeFileName(childGroup.name.substring(CHILD_EXPORT_PREFIX.length));
