@@ -3,12 +3,12 @@
 /*
 Exports PNGs from groups whose names start with "EX_".
 
-For each EX_ group:
-- Each immediate child subgroup is exported as a PNG.
-- Subgroups whose names start with "_" are ignored.
+For each visible EX_ group:
+- Each visible immediate child subgroup prefixed "ex_" is exported as a PNG.
 - If a sibling layer named "ws" exists, its bounds define the
   export canvas size for all PNGs in that group.
 - If no "ws" layer exists, exports use the full document canvas size.
+- Invisible EX_ groups and invisible ex_ subgroups are skipped.
 
 Files are named after the subgroup and saved to a folder chosen when the
 script runs.
@@ -25,10 +25,9 @@ app.bringToFront();
     var doc = app.activeDocument;
 
     var EXPORT_PREFIX = "EX_";
-    var IGNORE_CHILD_PREFIX = "_";
+    var CHILD_EXPORT_PREFIX = "ex_";
     var WIDGET_LAYER_NAME = "ws";
     var HIDE_WIDGET_IN_EXPORT = true;
-    var SKIP_HIDDEN_SUBGROUPS = true;
 
     var outputFolder = Folder.selectDialog("Choose an export folder");
     if (!outputFolder) return;
@@ -44,6 +43,10 @@ app.bringToFront();
             var parentGroup = doc.layerSets[i];
 
             if (!startsWith(parentGroup.name, EXPORT_PREFIX)) {
+                continue;
+            }
+
+            if (!parentGroup.visible) {
                 continue;
             }
 
@@ -82,11 +85,11 @@ app.bringToFront();
             for (var j = 0; j < parentGroup.layerSets.length; j++) {
                 var childGroup = parentGroup.layerSets[j];
 
-                if (startsWith(childGroup.name, IGNORE_CHILD_PREFIX)) {
+                if (!startsWith(childGroup.name, CHILD_EXPORT_PREFIX)) {
                     continue;
                 }
 
-                if (SKIP_HIDDEN_SUBGROUPS && !childGroup.visible) {
+                if (!childGroup.visible) {
                     continue;
                 }
 
