@@ -30,8 +30,22 @@ app.bringToFront();
     var PATH_PREFIX = "path_";
     var HIDE_WIDGET_IN_EXPORT = true;
 
-    var outputFolder = Folder.selectDialog("Choose an export folder");
+    var settingsFile = new File(File($.fileName).parent.fsName + "/export-ex-groups.lastdir");
+    var startFolder = Folder.desktop;
+    if (settingsFile.exists) {
+        settingsFile.open("r");
+        var savedPath = settingsFile.readln();
+        settingsFile.close();
+        var saved = new Folder(savedPath);
+        if (saved.exists) startFolder = saved;
+    }
+
+    var outputFolder = startFolder.selectDlg("Choose an export folder");
     if (!outputFolder) return;
+
+    settingsFile.open("w");
+    settingsFile.writeln(outputFolder.fsName);
+    settingsFile.close();
 
     var originalRulerUnits = app.preferences.rulerUnits;
     app.preferences.rulerUnits = Units.PIXELS;
