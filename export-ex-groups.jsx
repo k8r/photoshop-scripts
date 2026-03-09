@@ -26,7 +26,8 @@ app.bringToFront();
 
     var EXPORT_PREFIX = "EX_";
     var CHILD_EXPORT_PREFIX = "ex_";
-    var WIDGET_LAYER_NAME = "ws";
+    var WIDGET_SIZE_LAYER = "ws";
+    var PATH_PREFIX = "path_";
     var HIDE_WIDGET_IN_EXPORT = true;
 
     var outputFolder = Folder.selectDialog("Choose an export folder");
@@ -50,7 +51,17 @@ app.bringToFront();
                 continue;
             }
 
-            var widgetLayer = findImmediateArtLayerByName(parentGroup, WIDGET_LAYER_NAME);
+            var widgetLayer = findImmediateArtLayerByName(parentGroup, WIDGET_SIZE_LAYER);
+
+            var pathLayer = findImmediateArtLayerByPrefix(parentGroup, PATH_PREFIX);
+            var groupOutputFolder = outputFolder;
+            if (pathLayer) {
+                var subdir = pathLayer.name.substring(PATH_PREFIX.length);
+                groupOutputFolder = new Folder(outputFolder.fsName + "/" + subdir);
+                if (!groupOutputFolder.exists) {
+                    groupOutputFolder.create();
+                }
+            }
 
             var exportRect;
             var usingWidget = false;
@@ -71,7 +82,7 @@ app.bringToFront();
                     right: doc.width.as("px"),
                     bottom: doc.height.as("px")
                 };
-                notes.push("Parent group '" + parentGroup.name + "' has no '" + WIDGET_LAYER_NAME + "' layer; used full canvas size.");
+                notes.push("Parent group '" + parentGroup.name + "' has no '" + WIDGET_SIZE_LAYER + "' layer; used full canvas size.");
             }
 
             var exportWidth = exportRect.right - exportRect.left;
@@ -102,7 +113,7 @@ app.bringToFront();
                     exportWidth,
                     exportHeight,
                     usingWidget,
-                    outputFolder
+                    groupOutputFolder
                 );
 
                 exportedCount++;
@@ -163,7 +174,7 @@ app.bringToFront();
             dupChildGroup.translate(-dxCanvas, -dyCanvas);
         }
 
-        var safeName = sanitizeFileName(childGroup.name);
+        var safeName = sanitizeFileName(childGroup.name.substring(CHILD_EXPORT_PREFIX.length));
         var outFile = new File(outputFolder.fsName + "/" + safeName + ".png");
         saveDocumentAsPNG(tempDoc, outFile);
 
@@ -174,6 +185,15 @@ app.bringToFront();
     function findImmediateArtLayerByName(group, targetName) {
         for (var i = 0; i < group.artLayers.length; i++) {
             if (group.artLayers[i].name === targetName) {
+                return group.artLayers[i];
+            }
+        }
+        return null;
+    }
+
+    function findImmediateArtLayerByPrefix(group, prefix) {
+        for (var i = 0; i < group.artLayers.length; i++) {
+            if (startsWith(group.artLayers[i].name, prefix)) {
                 return group.artLayers[i];
             }
         }
