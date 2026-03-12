@@ -177,8 +177,8 @@ app.bringToFront();
 
     function exportChildGroup(sourceDoc, childGroup, exportRect, exportWidth, exportHeight, usingWidgetSize, outputFolder) {
         var tempDoc = app.documents.add(
-            exportWidth,
-            exportHeight,
+            sourceDoc.width,
+            sourceDoc.height,
             sourceDoc.resolution,
             childGroup.name,
             NewDocumentMode.RGB,
@@ -193,6 +193,7 @@ app.bringToFront();
 
         if (usingWidgetSize) {
             dupChildGroup.translate(-exportRect.left, -exportRect.top);
+            tempDoc.resizeCanvas(exportWidth, exportHeight, AnchorPosition.TOPLEFT);
         } else {
             tempDoc.trim(TrimType.TRANSPARENT);
         }
