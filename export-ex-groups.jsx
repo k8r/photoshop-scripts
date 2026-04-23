@@ -176,6 +176,13 @@ app.bringToFront();
     }
 
     function exportChildGroup(sourceDoc, childGroup, exportRect, exportWidth, exportHeight, usingWidgetSize, outputFolder) {
+        app.activeDocument = sourceDoc;
+
+        // Duplicate and merge in the source doc so layer effects (e.g. drop shadows
+        // using global light) are baked into pixels before moving to the temp doc.
+        var mergedLayer = childGroup.duplicate();
+        mergedLayer = mergedLayer.merge();
+
         var tempDoc = app.documents.add(
             sourceDoc.width,
             sourceDoc.height,
@@ -186,8 +193,8 @@ app.bringToFront();
         );
 
         app.activeDocument = sourceDoc;
-
-        var dupChildGroup = childGroup.duplicate(tempDoc, ElementPlacement.PLACEATBEGINNING);
+        var dupChildGroup = mergedLayer.duplicate(tempDoc, ElementPlacement.PLACEATBEGINNING);
+        mergedLayer.remove();
 
         app.activeDocument = tempDoc;
 
